@@ -327,17 +327,24 @@ def load_data(variant, ddir=data_dir,
     return d
     
 
-def generic_lnlike(data_dict,ell_kk,cl_kk,ell_cmb,cl_tt,cl_ee,cl_te,cl_bb,trim_lmax = 2998):
+def generic_lnlike(data_dict,ell_kk,cl_kk,ell_cmb,cl_tt,cl_ee,cl_te,cl_bb,
+                   aell_kk, acl_kk, aell_cmb, acl_tt, acl_ee, acl_te, acl_bb, trim_lmax = 2998):
 
     cl_kk = standardize(ell_kk,cl_kk,trim_lmax)
     cl_tt = standardize(ell_cmb,cl_tt,trim_lmax)
     cl_ee = standardize(ell_cmb,cl_ee,trim_lmax)
     cl_bb = standardize(ell_cmb,cl_bb,trim_lmax)
     cl_te = standardize(ell_cmb,cl_te,trim_lmax)
-    
+
+    acl_kk = standardize(aell_kk,acl_kk,trim_lmax)
+    acl_tt = standardize(aell_cmb,acl_tt,trim_lmax)
+    acl_ee = standardize(aell_cmb,acl_ee,trim_lmax)
+    acl_bb = standardize(aell_cmb,acl_bb,trim_lmax)
+    acl_te = standardize(aell_cmb,acl_te,trim_lmax)
+
     d = data_dict
     cinv = d['cinv']
-    clkk_act = get_corrected_clkk(data_dict,cl_kk,cl_tt,cl_te,cl_ee,cl_bb) if d['likelihood_corrections'] else cl_kk
+    clkk_act = get_corrected_clkk(data_dict,acl_kk,acl_tt,acl_te,acl_ee,acl_bb) if d['likelihood_corrections'] else acl_kk
     bclkk = d['binmat_act'] @ clkk_act
     if d['include_planck']:
         clkk_planck = get_corrected_clkk(data_dict,cl_kk,cl_tt,cl_te,cl_ee,cl_bb,'_planck') if d['likelihood_corrections'] else cl_kk
@@ -370,6 +377,7 @@ class ACTDR6LensLike(InstallableLikelihood):
     kmax = 10
     scale_cov = None
     alens = False # Whether to divide the theory spectrum by Alens
+    h1 = False  # H1 suspicious hypothesis
 
     def initialize(self):
         if self.lens_only: self.no_like_corrections = True
@@ -379,16 +387,25 @@ class ACTDR6LensLike(InstallableLikelihood):
                               mock=self.mock,nsims_act=self.nsims_act,nsims_planck=self.nsims_planck,
                               trim_lmax=self.trim_lmax,scale_cov=self.scale_cov)
         
+        # I don't think the below are used, and are copied from the cobaya example
         if self.no_like_corrections:
             self.requested_cls = ["pp"]
         else:
             self.requested_cls = ["tt", "te", "ee", "bb", "pp"]
 
     def get_requirements(self):
-        if self.no_like_corrections:
-            ret = {'Cl': {'tt': self.lmax,'te': self.lmax,'ee': self.lmax,'pp':self.lmax}}
+        if self.h1:
+            if self.no_like_corrections:
+                ret = {'actCl': {'tt': self.lmax,'te': self.lmax,'ee': self.lmax,'pp':self.lmax},
+                       'Cl': {'tt': self.lmax,'te': self.lmax,'ee': self.lmax,'pp':self.lmax}}
+            else:
+                ret = {'actCl': {'pp':self.lmax},
+                       'Cl': {'pp':self.lmax}}
         else:
-            ret = {'Cl': {'pp':self.lmax}}
+            if self.no_like_corrections:
+                ret = {'Cl': {'tt': self.lmax,'te': self.lmax,'ee': self.lmax,'pp':self.lmax}}
+            else:
+                ret = {'Cl': {'pp':self.lmax}}
 
         if self.limber:
             cobj = get_camb_lens_obj(self.nz,self.kmax,self.zmax)
@@ -397,26 +414,44 @@ class ACTDR6LensLike(InstallableLikelihood):
         return ret
 
     def logp(self, **params_values):
+        acl = self.theory.get_ACl(ell_factor=False, units='FIRASmuK2')
         cl = self.theory.get_Cl(ell_factor=False, units='FIRASmuK2')
-        return self.loglike(cl, **params_values)
+        return self.loglike(cl, acl, **params_values)
 
-    def get_limber_clkk(self,**params_values):
+    def get_limber_clkk(self, act=False, **params_values):
+        if act:
+            Pfunc = self.theory.get_act_Pk_interpolator(var_pair=("Weyl", "Weyl"), nonlinear=True, extrap_kmax=30.)
+            results = self.provider.get_actCAMBdata()
+            return get_limber_clkk_flat_universe(results,Pfunc,self.trim_lmax,self.kmax,nz,zstar=None)
+
         Pfunc = self.theory.get_Pk_interpolator(var_pair=("Weyl", "Weyl"), nonlinear=True, extrap_kmax=30.)
         results = self.provider.get_CAMBdata()
         return get_limber_clkk_flat_universe(results,Pfunc,self.trim_lmax,self.kmax,nz,zstar=None)
 
-    def loglike(self, cl, **params_values):
+    def loglike(self, cl, acl, **params_values):
         ell = cl['ell']
         Alens = 1
         if self.alens:
             Alens = self.theory.get_param('Alens')
         clpp = cl['pp'] / Alens
         if self.limber:
-            cl_kk = self.get_limber_clkk( **params_values)
+            cl_kk = self.get_limber_clkk(act=False, **params_values)
         else:
             cl_kk = pp_to_kk(clpp,ell)
+
+        aell = acl['ell']
+        aAlens = 1
+        if self.alens:
+            aAlens = self.theory.get_param('Alens')
+        aclpp = acl['pp'] / aAlens
+        if self.limber:
+            acl_kk = self.get_limber_clkk(act=True, **params_values)
+        else:
+            acl_kk = pp_to_kk(aclpp,aell)
         
-        logp = generic_lnlike(self.data,ell,cl_kk,ell,cl['tt'],cl['ee'],cl['te'],cl['bb'],self.trim_lmax)
+        
+        logp = generic_lnlike(self.data,ell,cl_kk,ell,cl['tt'],cl['ee'],cl['te'],cl['bb'],
+                              aell, acl_kk, aell, acl['tt'], acl['ee'], acl['te'], acl['bb'], self.trim_lmax)
         self.log.debug(
             f"ACT-DR6-lensing-like lnLike value = {logp} (chisquare = {-2 * logp})")
         return logp
