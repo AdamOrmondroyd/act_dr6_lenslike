@@ -330,11 +330,12 @@ def load_data(variant, ddir=data_dir,
 def generic_lnlike(data_dict,ell_kk,cl_kk,ell_cmb,cl_tt,cl_ee,cl_te,cl_bb,
                    aell_kk, acl_kk, aell_cmb, acl_tt, acl_ee, acl_te, acl_bb, trim_lmax = 2998):
 
-    cl_kk = standardize(ell_kk,cl_kk,trim_lmax)
-    cl_tt = standardize(ell_cmb,cl_tt,trim_lmax)
-    cl_ee = standardize(ell_cmb,cl_ee,trim_lmax)
-    cl_bb = standardize(ell_cmb,cl_bb,trim_lmax)
-    cl_te = standardize(ell_cmb,cl_te,trim_lmax)
+    if data_dict['include_planck']:
+        cl_kk = standardize(ell_kk,cl_kk,trim_lmax)
+        cl_tt = standardize(ell_cmb,cl_tt,trim_lmax)
+        cl_ee = standardize(ell_cmb,cl_ee,trim_lmax)
+        cl_bb = standardize(ell_cmb,cl_bb,trim_lmax)
+        cl_te = standardize(ell_cmb,cl_te,trim_lmax)
 
     acl_kk = standardize(aell_kk,acl_kk,trim_lmax)
     acl_tt = standardize(aell_cmb,acl_tt,trim_lmax)
@@ -396,16 +397,16 @@ class ACTDR6LensLike(InstallableLikelihood):
     def get_requirements(self):
         if self.h1:
             if self.no_like_corrections:
-                ret = {'actCl': {'tt': self.lmax,'te': self.lmax,'ee': self.lmax,'pp':self.lmax},
+                ret = {'ACTCl': {'tt': self.lmax,'te': self.lmax,'ee': self.lmax,'pp':self.lmax},
                        'Cl': {'tt': self.lmax,'te': self.lmax,'ee': self.lmax,'pp':self.lmax}}
             else:
-                ret = {'actCl': {'pp':self.lmax},
+                ret = {'ACTCl': {'pp':self.lmax},
                        'Cl': {'pp':self.lmax}}
         else:
             if self.no_like_corrections:
-                ret = {'Cl': {'tt': self.lmax,'te': self.lmax,'ee': self.lmax,'pp':self.lmax}}
+                ret = {'ACTCl': {'tt': self.lmax,'te': self.lmax,'ee': self.lmax,'pp':self.lmax}}
             else:
-                ret = {'Cl': {'pp':self.lmax}}
+                ret = {'ACTCl': {'pp':self.lmax}}
 
         if self.limber:
             cobj = get_camb_lens_obj(self.nz,self.kmax,self.zmax)
@@ -414,8 +415,11 @@ class ACTDR6LensLike(InstallableLikelihood):
         return ret
 
     def logp(self, **params_values):
-        acl = self.theory.get_ACl(ell_factor=False, units='FIRASmuK2')
-        cl = self.theory.get_Cl(ell_factor=False, units='FIRASmuK2')
+        acl = self.theory.get_ACTCl(ell_factor=False, units='FIRASmuK2')
+        if self.data['include_planck']:
+            cl = self.theory.get_Cl(ell_factor=False, units='FIRASmuK2')
+        else:
+            cl = {}
         return self.loglike(cl, acl, **params_values)
 
     def get_limber_clkk(self, act=False, **params_values):
@@ -429,15 +433,19 @@ class ACTDR6LensLike(InstallableLikelihood):
         return get_limber_clkk_flat_universe(results,Pfunc,self.trim_lmax,self.kmax,nz,zstar=None)
 
     def loglike(self, cl, acl, **params_values):
-        ell = cl['ell']
-        Alens = 1
-        if self.alens:
-            Alens = self.theory.get_param('Alens')
-        clpp = cl['pp'] / Alens
-        if self.limber:
-            cl_kk = self.get_limber_clkk(act=False, **params_values)
+        if self.data['include_planck']:
+            ell = cl['ell']
+            Alens = 1
+            if self.alens:
+                Alens = self.theory.get_param('Alens')
+            clpp = cl['pp'] / Alens
+            if self.limber:
+                cl_kk = self.get_limber_clkk(act=False, **params_values)
+            else:
+                cl_kk = pp_to_kk(clpp,ell)
         else:
-            cl_kk = pp_to_kk(clpp,ell)
+            ell = 0
+            cl_kk = 0
 
         aell = acl['ell']
         aAlens = 1
@@ -450,7 +458,7 @@ class ACTDR6LensLike(InstallableLikelihood):
             acl_kk = pp_to_kk(aclpp,aell)
         
         
-        logp = generic_lnlike(self.data,ell,cl_kk,ell,cl['tt'],cl['ee'],cl['te'],cl['bb'],
+        logp = generic_lnlike(self.data,ell,cl_kk,ell,cl.pop('tt', None),cl.pop('ee', None),cl.pop('te', None),cl.pop('bb', None),
                               aell, acl_kk, aell, acl['tt'], acl['ee'], acl['te'], acl['bb'], self.trim_lmax)
         self.log.debug(
             f"ACT-DR6-lensing-like lnLike value = {logp} (chisquare = {-2 * logp})")
