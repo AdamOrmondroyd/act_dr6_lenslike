@@ -366,7 +366,7 @@ def generic_lnlike(data_dict,ell_kk,cl_kk,ell_cmb,cl_tt,cl_ee,cl_te,cl_bb,
 # =================
 
 
-class ACTDR6LensLike(InstallableLikelihood):
+class ACTCAMBDR6LensLike(InstallableLikelihood):
 
     lmax: int
     mock = False
