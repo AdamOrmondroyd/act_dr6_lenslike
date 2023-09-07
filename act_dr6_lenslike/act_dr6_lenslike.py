@@ -343,6 +343,12 @@ def generic_lnlike(data_dict,ell_kk,cl_kk,ell_cmb,cl_tt,cl_ee,cl_te,cl_bb,
     acl_bb = standardize(aell_cmb,acl_bb,trim_lmax)
     acl_te = standardize(aell_cmb,acl_te,trim_lmax)
 
+    print(f"{np.allclose(cl_kk, acl_kk)=}", flush=True)
+    print(f"{np.allclose(cl_tt, acl_tt)=}", flush=True)
+    print(f"{np.allclose(cl_ee, acl_ee)=}", flush=True)
+    print(f"{np.allclose(cl_bb, acl_bb)=}", flush=True)
+    print(f"{np.allclose(cl_te, acl_te)=}", flush=True)
+
     d = data_dict
     cinv = d['cinv']
     clkk_act = get_corrected_clkk(data_dict,acl_kk,acl_tt,acl_te,acl_ee,acl_bb) if d['likelihood_corrections'] else acl_kk
@@ -424,8 +430,8 @@ class ACTDR6LensLike(InstallableLikelihood):
 
     def get_limber_clkk(self, act=False, **params_values):
         if act:
-            Pfunc = self.theory.get_act_Pk_interpolator(var_pair=("Weyl", "Weyl"), nonlinear=True, extrap_kmax=30.)
-            results = self.provider.get_actCAMBdata()
+            Pfunc = self.theory.get_ACTPk_interpolator(var_pair=("Weyl", "Weyl"), nonlinear=True, extrap_kmax=30.)
+            results = self.provider.get_ACTCAMBdata()
             return get_limber_clkk_flat_universe(results,Pfunc,self.trim_lmax,self.kmax,nz,zstar=None)
 
         Pfunc = self.theory.get_Pk_interpolator(var_pair=("Weyl", "Weyl"), nonlinear=True, extrap_kmax=30.)
@@ -433,6 +439,7 @@ class ACTDR6LensLike(InstallableLikelihood):
         return get_limber_clkk_flat_universe(results,Pfunc,self.trim_lmax,self.kmax,nz,zstar=None)
 
     def loglike(self, cl, acl, **params_values):
+        print(f"{self.alens=}", flush=True)
         if self.data['include_planck']:
             ell = cl['ell']
             Alens = 1
@@ -443,6 +450,7 @@ class ACTDR6LensLike(InstallableLikelihood):
                 cl_kk = self.get_limber_clkk(act=False, **params_values)
             else:
                 cl_kk = pp_to_kk(clpp,ell)
+                print(f"{cl_kk}", flush=True)
         else:
             ell = 0
             cl_kk = 0
@@ -450,15 +458,22 @@ class ACTDR6LensLike(InstallableLikelihood):
         aell = acl['ell']
         aAlens = 1
         if self.alens:
-            aAlens = self.theory.get_param('Alens')
+            aAlens = self.theory.get_param('ACTAlens')
         aclpp = acl['pp'] / aAlens
         if self.limber:
             acl_kk = self.get_limber_clkk(act=True, **params_values)
         else:
             acl_kk = pp_to_kk(aclpp,aell)
+        print(f"{acl_kk}", flush=True)
+        print(f"{np.allclose(acl_kk, cl_kk)=}", flush=True)
+        print(f"{np.allclose(aell, ell)=}", flush=True)
+        print(f"{np.allclose(acl['tt'], cl['tt'])=}")
+        print(f"{np.allclose(acl['ee'], cl['ee'])=}")
+        print(f"{np.allclose(acl['te'], cl['te'])=}")
+        print(f"{np.allclose(acl['bb'], cl['bb'])=}")
         
         
-        logp = generic_lnlike(self.data,ell,cl_kk,ell,cl.pop('tt', None),cl.pop('ee', None),cl.pop('te', None),cl.pop('bb', None),
+        logp = generic_lnlike(self.data,ell,cl_kk,ell,cl.get('tt', None),cl.get('ee', None),cl.get('te', None),cl.get('bb', None),
                               aell, acl_kk, aell, acl['tt'], acl['ee'], acl['te'], acl['bb'], self.trim_lmax)
         self.log.debug(
             f"ACT-DR6-lensing-like lnLike value = {logp} (chisquare = {-2 * logp})")
