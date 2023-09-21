@@ -343,11 +343,11 @@ def generic_lnlike(data_dict,ell_kk,cl_kk,ell_cmb,cl_tt,cl_ee,cl_te,cl_bb,
     acl_bb = standardize(aell_cmb,acl_bb,trim_lmax)
     acl_te = standardize(aell_cmb,acl_te,trim_lmax)
 
-    print(f"{np.allclose(cl_kk, acl_kk)=}", flush=True)
-    print(f"{np.allclose(cl_tt, acl_tt)=}", flush=True)
-    print(f"{np.allclose(cl_ee, acl_ee)=}", flush=True)
-    print(f"{np.allclose(cl_bb, acl_bb)=}", flush=True)
-    print(f"{np.allclose(cl_te, acl_te)=}", flush=True)
+    # print(f"{np.allclose(cl_kk, acl_kk)=}", flush=True)
+    # print(f"{np.allclose(cl_tt, acl_tt)=}", flush=True)
+    # print(f"{np.allclose(cl_ee, acl_ee)=}", flush=True)
+    # print(f"{np.allclose(cl_bb, acl_bb)=}", flush=True)
+    # print(f"{np.allclose(cl_te, acl_te)=}", flush=True)
 
     d = data_dict
     cinv = d['cinv']
@@ -384,7 +384,6 @@ class ACTCAMBDR6LensLike(InstallableLikelihood):
     kmax = 10
     scale_cov = None
     alens = False # Whether to divide the theory spectrum by Alens
-    h1 = False  # H1 suspicious hypothesis
 
     def initialize(self):
         if self.lens_only: self.no_like_corrections = True
@@ -401,7 +400,7 @@ class ACTCAMBDR6LensLike(InstallableLikelihood):
             self.requested_cls = ["tt", "te", "ee", "bb", "pp"]
 
     def get_requirements(self):
-        if self.h1:
+        if self.data['include_planck']:
             if self.no_like_corrections:
                 ret = {'ACTCl': {'tt': self.lmax,'te': self.lmax,'ee': self.lmax,'pp':self.lmax},
                        'Cl': {'tt': self.lmax,'te': self.lmax,'ee': self.lmax,'pp':self.lmax}}
@@ -439,7 +438,8 @@ class ACTCAMBDR6LensLike(InstallableLikelihood):
         return get_limber_clkk_flat_universe(results,Pfunc,self.trim_lmax,self.kmax,nz,zstar=None)
 
     def loglike(self, cl, acl, **params_values):
-        print(f"{self.alens=}", flush=True)
+        # print(f"{params_values=}", flush=True)
+        # print(f"{self.alens=}", flush=True)
         if self.data['include_planck']:
             ell = cl['ell']
             Alens = 1
@@ -450,7 +450,7 @@ class ACTCAMBDR6LensLike(InstallableLikelihood):
                 cl_kk = self.get_limber_clkk(act=False, **params_values)
             else:
                 cl_kk = pp_to_kk(clpp,ell)
-                print(f"{cl_kk}", flush=True)
+                # print(f"{cl_kk}", flush=True)
         else:
             ell = 0
             cl_kk = 0
@@ -464,13 +464,13 @@ class ACTCAMBDR6LensLike(InstallableLikelihood):
             acl_kk = self.get_limber_clkk(act=True, **params_values)
         else:
             acl_kk = pp_to_kk(aclpp,aell)
-        print(f"{acl_kk}", flush=True)
-        print(f"{np.allclose(acl_kk, cl_kk)=}", flush=True)
-        print(f"{np.allclose(aell, ell)=}", flush=True)
-        print(f"{np.allclose(acl['tt'], cl['tt'])=}")
-        print(f"{np.allclose(acl['ee'], cl['ee'])=}")
-        print(f"{np.allclose(acl['te'], cl['te'])=}")
-        print(f"{np.allclose(acl['bb'], cl['bb'])=}")
+        # print(f"{acl_kk}", flush=True)
+        # print(f"{np.allclose(acl_kk, cl_kk)=}", flush=True)
+        # print(f"{np.allclose(aell, ell)=}", flush=True)
+        # print(f"{np.allclose(acl['tt'], cl['tt'])=}")
+        # print(f"{np.allclose(acl['ee'], cl['ee'])=}")
+        # print(f"{np.allclose(acl['te'], cl['te'])=}")
+        # print(f"{np.allclose(acl['bb'], cl['bb'])=}")
         
         
         logp = generic_lnlike(self.data,ell,cl_kk,ell,cl.get('tt', None),cl.get('ee', None),cl.get('te', None),cl.get('bb', None),
