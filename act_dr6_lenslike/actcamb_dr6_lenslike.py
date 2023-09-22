@@ -420,20 +420,20 @@ class ACTCAMBDR6LensLike(InstallableLikelihood):
         return ret
 
     def logp(self, **params_values):
-        acl = self.theory.get_ACTCl(ell_factor=False, units='FIRASmuK2')
+        acl = self.provider.get_ACTCl(ell_factor=False, units='FIRASmuK2')
         if self.data['include_planck']:
-            cl = self.theory.get_Cl(ell_factor=False, units='FIRASmuK2')
+            cl = self.provider.get_Cl(ell_factor=False, units='FIRASmuK2')
         else:
             cl = {}
         return self.loglike(cl, acl, **params_values)
 
     def get_limber_clkk(self, act=False, **params_values):
         if act:
-            Pfunc = self.theory.get_ACTPk_interpolator(var_pair=("Weyl", "Weyl"), nonlinear=True, extrap_kmax=30.)
+            Pfunc = self.provider.get_ACTPk_interpolator(var_pair=("Weyl", "Weyl"), nonlinear=True, extrap_kmax=30.)
             results = self.provider.get_ACTCAMBdata()
             return get_limber_clkk_flat_universe(results,Pfunc,self.trim_lmax,self.kmax,nz,zstar=None)
 
-        Pfunc = self.theory.get_Pk_interpolator(var_pair=("Weyl", "Weyl"), nonlinear=True, extrap_kmax=30.)
+        Pfunc = self.provider.get_Pk_interpolator(var_pair=("Weyl", "Weyl"), nonlinear=True, extrap_kmax=30.)
         results = self.provider.get_CAMBdata()
         return get_limber_clkk_flat_universe(results,Pfunc,self.trim_lmax,self.kmax,nz,zstar=None)
 
@@ -444,7 +444,7 @@ class ACTCAMBDR6LensLike(InstallableLikelihood):
             ell = cl['ell']
             Alens = 1
             if self.alens:
-                Alens = self.theory.get_param('Alens')
+                Alens = self.provider.get_param('Alens')
             clpp = cl['pp'] / Alens
             if self.limber:
                 cl_kk = self.get_limber_clkk(act=False, **params_values)
@@ -458,7 +458,7 @@ class ACTCAMBDR6LensLike(InstallableLikelihood):
         aell = acl['ell']
         aAlens = 1
         if self.alens:
-            aAlens = self.theory.get_param('ACTAlens')
+            aAlens = self.provider.get_param('ACTAlens')
         aclpp = acl['pp'] / aAlens
         if self.limber:
             acl_kk = self.get_limber_clkk(act=True, **params_values)
